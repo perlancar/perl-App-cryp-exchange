@@ -1,0 +1,68 @@
+#!perl
+
+# DATE
+# VERSION
+
+use 5.010001;
+use strict;
+use warnings;
+use Log::ger;
+
+use Perinci::CmdLine::cryp;
+
+my $prefix = "/App/cryp/exchange/";
+
+Perinci::CmdLine::cryp->new(
+    url => $prefix,
+    log => 1,
+    pass_cmdline_object => 1,
+    config_filename => ["cryp.conf", "cryp-exchange.conf"],
+    subcommands => {
+        "ls-exchanges"      => { url => "${prefix}list_exchanges", },
+        "ls-accounts"       => { url => "${prefix}list_accounts", },
+    },
+)->run;
+
+# ABSTRACT:
+# PODNAME:
+
+=head1 SYNOPSIS
+
+Create configuration in F<~/.config/cryp-exchange.conf> (or
+F<~/.config/cryp.conf> so configuration can be shared with the other C<cryp-*>
+family of scripts):
+
+ [exchange/bitcoin-indonesia]
+ key    = S6WBYR6Q-TVMTSFOA-YWK6GSNT-H0JMEK6Z-YDF5ML9Y
+ secret = e16064aa7fb477b267fe774df62194f33583c7f46a09ad931ca2e097aeaa9c9296e1c3b2734bab71
+
+ ; if you have another account on the same exchange
+ [exchange/bitcoin-indonesia/wifey]
+ key    = EKSGJUOR-ROR9K24P-Q45UBWVG-GZHANPQV-UY4Z1WBM
+ secret = 71100dc13ffe4d082239c06b5c36fd8f0548cd97056ffa2ee491ae4dfd4f996fb468ef3c70b12073
+
+ [exchange/gdax]
+ key        = 2171d01f1de2518c94a11870a6df22d0
+ secret     = 9B8T2nPFMRUiUIKA82txjaO09iNnJXBMVMdkDgJ0i2YambYKQY8DZAS54ERZE0sE2lzYrpTWfpU7/110xfesZluY
+ passphrase = gdllszgwO774NN
+
+To list supported exchanges:
+
+ % cryp-exchange ls-exchanges
+ % cryp-exchange ls-exchanges -l
+
+To list pairs:
+
+ % cryp-exchange ls-pairs
+ % cryp-exchange ls-pairs -l
+ % cryp-exchange ls-pairs -l -I gdax
+
+
+=head1 DESCRIPTION
+
+Early release. More functionality will be added in the future.
+
+
+=head1 SEE ALSO
+
+The other C<cryp-*> scripts in the family.
