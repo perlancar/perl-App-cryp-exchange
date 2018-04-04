@@ -1,4 +1,4 @@
-package App::cryp::Exchange::bitcoin_indonesia;
+package App::cryp::Exchange::gdax;
 
 # DATE
 # VERSION
@@ -11,68 +11,55 @@ use Role::Tiny::With;
 with 'App::cryp::Role::Exchange';
 
 sub new {
-    require Finance::BTCIndo;
+    require Finance::GDAX::Lite;
 
     my ($class, %args) = @_;
 
     unless ($args{public_only}) {
-        die "Please supply api_key and api_secret"
-            unless $args{api_key} && $args{api_secret};
+        die "Please supply api_key, api_secret, api_passphrase"
+            unless $args{api_key} && $args{api_secret}
+            && defined $args{api_passphrase};
     }
 
-    $args{_client} = Finance::BTCIndo->new(
+    $args{_client} = Finance::GDAX::Lite->new(
         key => $args{api_key},
         secret => $args{api_secret},
+        passphrase => $args{api_passphrase},
     );
 
     bless \%args, $class;
 }
 
-sub data_native_pair_separator { '_' }
+sub data_native_pair_separator { '-' }
 
 sub data_canonical_currencies {
-    state $data = do {
-        require App::btcindo;
-        my %hash = %App::btcindo::Canonical_Currencies;
-        for my $k (keys %hash) {
-            $hash{uc $k} = uc(delete $hash{$k});
-        }
-        \%hash;
-    };
+    state $data = {};
     $data;
 }
 
 sub data_reverse_canonical_currencies {
-    state $data = do {
-        require App::btcindo;
-        my %hash = %App::btcindo::Rev_Canonical_Currencies;
-        for my $k (keys %hash) {
-            $hash{uc $k} = uc(delete $hash{$k});
-        }
-        \%hash;
-    };
+    state $data = {};
     $data;
 }
 
 sub list_pairs {
     my ($self, %args) = @_;
 
-    require App::btcindo;
-    # XXX in the future, we will put the master data here instead of in
-    # App::btcindo
-
-    my $res = App::btcindo::pairs();
+    my $res = $self->{_client}->public_request(GET => "/products");
     return $res unless $res->[0] == 200;
 
     my @res;
     for (@{ $res->[2] }) {
+        my $pair;
         if ($args{native}) {
-            $_ = lc $self->to_native_pair($_);
+            $pair = $self->to_native_pair($_->{id});
         } else {
-            $_ = $self->to_canonical_pair($_);
+            $pair = $self->to_canonical_pair($_->{id});
         }
         push @res, {
-            pair => $_,
+            pair            => $pair,
+            quote_increment => $_->{quote_increment},
+            status          => $_->{status},
         };
     }
 
@@ -86,16 +73,15 @@ sub list_pairs {
 sub get_order_book {
     my ($self, %args) = @_;
 
-    my $pair = lc $self->to_native_pair($args{pair});
+    my $pair = $self->to_native_pair($args{pair});
 
-    my $res;
-    eval { $res = $self->{_client}->get_depth(pair => $pair) };
-    return [500, "Died: $@"] if $@;
+    my $res = $self->{_client}->public_request(GET => "/products/$pair/book?level=2");
+    return $res unless $res->[0] == 200;
 
     my @res;
     {
         last if $args{type} && $args{type} ne 'buy';
-        for my $rec (@{ $res->{buy} }) {
+        for my $rec (@{ $res->[2]{bids} }) {
             push @res, {
                 type   => "buy",
                 price  => $rec->[0],
@@ -105,7 +91,7 @@ sub get_order_book {
     }
     {
         last if $args{type} && $args{type} ne 'sell';
-        for my $rec (@{ $res->{sell} }) {
+        for my $rec (@{ $res->[2]{asks} }) {
             push @res, {
                 type   => "sell",
                 price  => $rec->[0],

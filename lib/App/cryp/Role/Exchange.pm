@@ -10,10 +10,22 @@ use warnings;
 use Role::Tiny;
 
 requires qw(
+               new
                list_pairs
+               data_native_pair_separator
                data_canonical_currencies
-               data_reverse_canonical_currencies
        );
+
+sub data_reverse_canonical_currencies {
+    my $self = shift;
+
+    return $self->{_reverse_canonical_currencies}
+        if $self->{_reverse_canonical_currencies};
+
+    $self->{_reverse_canonical_currencies} = {
+        reverse %{ $self->data_canonical_currencies }
+    };
+}
 
 sub to_canonical_currency {
     my ($self, $cur) = @_;
@@ -30,9 +42,24 @@ sub to_native_currency {
 }
 
 sub to_canonical_pair {
+    my ($self, $pair) = @_;
+
+    my ($cur1, $cur2) = $pair =~ /(\w+)[\W_](\w+)/
+        or die "Invalid pair '$pair'";
+    sprintf "%s/%s",
+        $self->to_canonical_currency($cur1),
+        $self->to_canonical_currency($cur2);
 }
 
 sub to_native_pair {
+    my ($self, $pair) = @_;
+
+    my ($cur1, $cur2) = $pair =~ /(\w+)[\W_](\w+)/
+        or die "Invalid pair '$pair'";
+    sprintf "%s%s%s",
+        $self->to_native_currency($cur1),
+        $self->data_native_pair_separator,
+        $self->to_native_currency($cur2);
 }
 
 1;
@@ -93,7 +120,7 @@ Canonical codes are listed in L<CryptoCurrency::Catalog>.
 
 Usage:
 
-  new(%args) => obj
+ new(%args) => obj
 
 Constructor. Known arguments:
 
@@ -101,15 +128,40 @@ Constructor. Known arguments:
 
 =item * api_key
 
+String. Required.
+
 =item * api_secret
+
+String. Required.
 
 =back
 
+Some specific exchanges might require more credentials or arguments; please
+check with the specific drivers.
+
 Method must return object.
+
+=head2 data_native_pair_separator
+
+Should return a single-character string.
+
+=head2 data_canonical_currencies
+
+Should return a hashref, a mapping between exchange-native currency codes to
+canonical/standardized currency codes.
+
+=head2 data_reverse_canonical_currencies
+
+Returns hashref, a mapping of canonical/standardized currency codes to exchange
+native codes, which is produced by reversing the hash returned by
+C</"data_canonical_currencies"> and caching the result in the instance's
+C<_reverse_canonical_currencies> key. Driver can provide its own implementation.
 
 =head2 list_pairs
 
-Usage: $xchg->list_pairs => [$status, $reason, $payload, \%resmeta]
+Usage:
+
+ $xchg->list_pairs => [$status, $reason, $payload, \%resmeta]
 
 List all pairs available for trading.
 
@@ -118,12 +170,17 @@ names (except when C<detail> argument is set to true, in which case method must
 return array of records/hashrefs).
 
 Pair names must be in the form of I<< <currency1>/<currency2> >> where I<<
-<currency2> >> is the base currency symbol. Currency symbols must follow list in
+<currency2> >> is the base currency code. Currency codes must follow list in
 L<CryptoCurrency::Catalog>. Some example pair names: BTC/USD, ETH/BTC.
 
 Known options:
 
 =over
+
+=item * native
+
+Boolean. Default 0. If set to 1, method must return pair codes in native
+exchange form instead of canonical/standardized form.
 
 =item * detail
 
@@ -135,6 +192,32 @@ additional keys.
 
 =back
 
+=head2 get_order_book
+
+Usage:
+
+ $xchg->get_order_book => [$status, $reason, $payload, \%resmeta]
+
+Method should return payload as an array of hashrefs. Each hashref (record)
+should contain these keys: C<type> (str, either "buy" or "sell"), C<price>
+(float), C<amount> (float). Buy (bid, purchase) records must be sorted from
+highest price to lowest price. Sell (ask, offer) records must be sorted from
+lowest price to highest.
+
+Known options:
+
+=over
+
+=item * pair
+
+String. Pair.
+
+=item * type
+
+String. Can be set to "buy" or "sell" to filter only return buy records or sell
+records respectively.
+
+=back
 
 
 =head1 SEE ALSO
