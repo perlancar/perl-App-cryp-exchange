@@ -111,7 +111,17 @@ Usage:
 Convert canonical/standardized currency code to exchange-native currency code.
 Canonical codes are listed in L<CryptoCurrency::Catalog>.
 
-=head2
+=head2 to_canonical_pair
+
+Usage:
+
+ $xchg->to_canonical_pair($pair) => str
+
+=head2 to_native_pair
+
+Usage:
+
+ $xchg->to_native_pair($pair) => str
 
 
 =head1 REQUIRED METHODS
