@@ -12,6 +12,7 @@ our %SPEC;
 
 our $_complete_exchange = sub {
     require Complete::Util;
+    require PERLANCAR::Module::List;
 
     my %args = @_;
 
