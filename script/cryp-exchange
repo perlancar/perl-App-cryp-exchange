@@ -77,7 +77,12 @@ To get order book:
 
 =head1 DESCRIPTION
 
-Early release. More functionality will be added in the future.
+B<Early release. More functionality will be added in the future.>
+
+This utility (and the corresponding backend modules) provide a common interface
+to interact with various cryptocurrency exchanges: common set of subcommands
+(methods) with common arguments and result format, standardized currency codes
+(following L<CryptoCurrency::Catalog>) and pair formats (e.g. C<BTC/USD>).
 
 
 =head1 SEE ALSO
