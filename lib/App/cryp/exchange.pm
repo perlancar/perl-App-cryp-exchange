@@ -211,10 +211,36 @@ sub get_order_book {
 
     my $xchg = _instantiate_exchange($r, $args{exchange});
 
-    $xchg->get_order_book(
+    my $res = $xchg->get_order_book(
         pair => $args{pair},
-        type => $args{type},
     );
+    return $res unless $res->[0] == 200;
+
+    # display in a 2d table format which is more user-friendly for cli user
+    my @rows;
+    {
+        last if $args{type} && $args{type} ne 'buy';
+        for my $rec (@{ $res->[2]{buy} }) {
+            push @rows, {
+                type   => "buy",
+                price  => $rec->[0],
+                amount => $rec->[1],
+            };
+        }
+    }
+
+    {
+        last if $args{type} && $args{type} ne 'sell';
+        for my $rec (@{ $res->[2]{sell} }) {
+            push @rows, {
+                type   => "sell",
+                price  => $rec->[0],
+                amount => $rec->[1],
+            };
+        }
+    }
+
+    [200, "OK", \@rows];
 }
 
 

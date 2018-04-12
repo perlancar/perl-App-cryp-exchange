@@ -59,7 +59,7 @@ sub list_pairs {
         push @res, {
             pair            => $pair,
             quote_increment => $_->{quote_increment},
-            status          => $_->{status},
+            status          => $_->{status}, # online,
         };
     }
 
@@ -78,29 +78,10 @@ sub get_order_book {
     my $res = $self->{_client}->public_request(GET => "/products/$pair/book?level=2");
     return $res unless $res->[0] == 200;
 
-    my @res;
-    {
-        last if $args{type} && $args{type} ne 'buy';
-        for my $rec (@{ $res->[2]{bids} }) {
-            push @res, {
-                type   => "buy",
-                price  => $rec->[0],
-                amount => $rec->[1],
-            };
-        }
-    }
-    {
-        last if $args{type} && $args{type} ne 'sell';
-        for my $rec (@{ $res->[2]{asks} }) {
-            push @res, {
-                type   => "sell",
-                price  => $rec->[0],
-                amount => $rec->[1],
-            };
-        }
-    }
+    $res->[2]{buy}  = delete $res->[2]{bids};
+    $res->[2]{sell} = delete $res->[2]{asks};
 
-    [200, "OK", \@res];
+    [200, "OK", $res->[2]];
 }
 
 1;
