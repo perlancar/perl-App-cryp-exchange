@@ -1,4 +1,4 @@
-package App::cryp::Exchange::bitcoin_indonesia;
+package App::cryp::Exchange::indodax;
 
 # DATE
 # VERSION
@@ -96,6 +96,6 @@ sub get_order_book {
 }
 
 1;
-# ABSTRACT: Interact with Bitcoin Indonesia
+# ABSTRACT: Interact with Indodax
 
 =for Pod::Coverage ^(.+)$
