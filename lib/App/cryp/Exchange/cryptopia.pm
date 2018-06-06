@@ -50,12 +50,12 @@ sub data_reverse_canonical_currencies {
 sub list_pairs {
     my ($self, %args) = @_;
 
-    my $res;
-    eval { $res = $self->{_client}->api_public(method => 'GetTradePairs') };
+    my $apires;
+    eval { $apires = $self->{_client}->api_public(method => 'GetTradePairs') };
     return [500, "Died: $@"] if $@;
 
     my @res;
-    for (@$res) {
+    for (@$apires) {
         my $pair;
         if ($args{native}) {
             $pair = $self->to_native_pair($_->{Label});
@@ -85,27 +85,59 @@ sub get_order_book {
 
     $pair =~ s!/!_!;
 
-    my $res;
-    eval { $res = $self->{_client}->api_public(
+    my $apires;
+    eval { $apires = $self->{_client}->api_public(
         method => "GetMarketOrders",
         parameters => [$pair],
     ) };
     return [500, "Died: $@"] if $@;
 
-    $res->{buy}  = delete $res->{Buy};
-    $res->{sell} = delete $res->{Sell};
+    $apires->{buy}  = delete $apires->{Buy};
+    $apires->{sell} = delete $apires->{Sell};
 
-    for (@{ $res->{buy} }, @{ $res->{sell} }) {
+    for (@{ $apires->{buy} }, @{ $apires->{sell} }) {
         $_ = [
             $_->{Price},
             $_->{Volume},
         ];
     }
 
-    [200, "OK", $res];
+    [200, "OK", $apires];
+}
+
+sub list_balances {
+    my ($self, %args) = @_;
+
+    my $apires;
+    eval { $apires = $self->{_client}->api_private(
+        method => "GetBalances",
+        parameters => {},
+    ) };
+    return [500, "Died: $@"] if $@;
+
+    my @recs;
+    for (@$apires) {
+        my $rec = {
+            currency  => $self->to_canonical_currency($_->{Symbol}),
+            available => $_->{Available},
+            hold      => $_->{HeldForTrades},
+            total     => $_->{Total},
+
+            unconfirmed      => $_->{Unconfirmed},
+            pending_withdraw => $_->{PendingWithdraw},
+        };
+    }
+
+    [200, "OK", \@recs];
 }
 
 1;
 # ABSTRACT: Interact with Cryptopia
 
 =for Pod::Coverage ^(.+)$
+
+=head1 SEE ALSO
+
+Official Cryptopia API reference: L<Public
+API|https://support.cryptopia.co.nz/csm?id=kb_article&sys_id=40e9c310dbf9130084ed147a3a9619eb>,
+L<Private API|https://support.cryptopia.co.nz/csm?id=kb_article&sys_id=a75703dcdbb9130084ed147a3a9619bc>
