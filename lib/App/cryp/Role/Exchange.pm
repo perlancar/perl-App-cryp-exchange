@@ -11,9 +11,11 @@ use Role::Tiny;
 
 requires qw(
                new
-               list_pairs
-               data_native_pair_separator
+
                data_canonical_currencies
+               data_native_pair_separator
+               list_balances
+               list_pairs
        );
 
 sub data_reverse_canonical_currencies {
@@ -163,9 +165,25 @@ canonical/standardized currency codes.
 =head2 data_reverse_canonical_currencies
 
 Returns hashref, a mapping of canonical/standardized currency codes to exchange
-native codes, which is produced by reversing the hash returned by
-C</"data_canonical_currencies"> and caching the result in the instance's
-C<_reverse_canonical_currencies> key. Driver can provide its own implementation.
+native codes. This role already provides an implementation, which calculates the
+hashref by reversing the hash returned by C</"data_canonical_currencies"> and
+caching the result in the instance's C<_reverse_canonical_currencies> key.
+Driver can provide its own implementation.
+
+=head2 list_balances
+
+Usage:
+
+ $xchg->list_balances(%args) => [$status, $reason, $payload, \%resmeta]
+
+List account balances.
+
+Method must return enveloped result. Payload must be an array of hashrefs. Each
+hashref must contain at least these keys: C<currency> (fiat_or_crpytocurrency),
+C<available> (num, balance available for trading i.e. buying), C<hold> (num,
+balance that is currently held so not available for trading, e.g. balance on
+currently open buy orders). C<total> (num, should be C<available> + C<hold>).
+Hashref may contain additional keys.
 
 =head2 list_pairs
 
@@ -179,9 +197,9 @@ Method must return enveloped result. Payload must be an array containing pair
 names (except when C<detail> argument is set to true, in which case method must
 return array of records/hashrefs).
 
-Pair names must be in the form of I<< <currency1>/<currency2> >> where I<<
-<currency2> >> is the base currency code. Currency codes must follow list in
-L<CryptoCurrency::Catalog>. Some example pair names: BTC/USD, ETH/BTC.
+Pair names must be in the form of I<< <currency1>/<currency2> >> where
+I<currency1> is cryptocurrency code and I<< <currency2> >> is the base currency
+code (fiat or crypto). Some example pair names: BTC/USD, ETH/BTC.
 
 Known arguments:
 

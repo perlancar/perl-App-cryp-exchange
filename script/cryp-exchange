@@ -27,6 +27,7 @@ Perinci::CmdLine::cryp->new(
 
         # private
         "get-order-book"    => { url => "${prefix}get_order_book", },
+        "ls-balances"       => { url => "${prefix}list_balances", },
     },
 )->run;
 

@@ -243,6 +243,22 @@ sub get_order_book {
     [200, "OK", \@rows];
 }
 
+$SPEC{list_balances} = {
+    v => 1.1,
+    summary => 'List account balances',
+    args => {
+        %arg_req0_exchange,
+    },
+};
+sub list_balances {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $xchg = _instantiate_exchange($r, $args{exchange});
+
+    $xchg->list_balances;
+}
 
 1;
 # ABSTRACT:
