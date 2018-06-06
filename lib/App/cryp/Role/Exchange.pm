@@ -179,10 +179,35 @@ Usage:
 List account balances.
 
 Method must return enveloped result. Payload must be an array of hashrefs. Each
-hashref must contain at least these keys: C<currency> (fiat_or_crpytocurrency),
-C<available> (num, balance available for trading i.e. buying), C<hold> (num,
-balance that is currently held so not available for trading, e.g. balance on
-currently open buy orders). C<total> (num, should be C<available> + C<hold>).
+hashref must contain at least these keys:
+
+=over
+
+=item * currency
+
+fiat_or_crpytocurrency.
+
+=item * available
+
+num, balance available for trading i.e. buying.
+
+=item * hold
+
+num, balance that is currently held so not available for trading, e.g. balance
+currently tied on open buy orders.
+
+=item * total
+
+num, usually C<available> + C<hold> but can also be C<available> + C<hold> +
+C<pending_withdraw>. Generally not very useful.
+
+=back
+
+Hashref may also contain these keys: C<pending_withdraw> (balance that is in the
+process of withdrawn to another exchange, etc), C<unconfirmed> (balance that has
+recently been deposited but unconfirmed e.g. has not reached the minimum number
+of confirmations).
+
 Hashref may contain additional keys.
 
 =head2 list_pairs
