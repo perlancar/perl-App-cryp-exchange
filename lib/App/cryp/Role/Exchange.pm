@@ -146,8 +146,8 @@ String. Required.
 
 =back
 
-Some specific exchanges might require more credentials or arguments; please
-check with the specific drivers.
+Some specific exchanges might require more credentials or arguments (e.g.
+C<api_passphrase> on GDAX); please check with the specific drivers.
 
 Method must return object.
 
