@@ -81,6 +81,11 @@ sub get_order_book {
     $apires->[2]{buy}  = delete $apires->[2]{bids};
     $apires->[2]{sell} = delete $apires->[2]{asks};
 
+    # remove the num-orders part
+    for (@{ $apires->[2]{buy} }, @{ $apires->[2]{sell} }) {
+        splice @$_, 2;
+    }
+
     [200, "OK", $apires->[2]];
 }
 
