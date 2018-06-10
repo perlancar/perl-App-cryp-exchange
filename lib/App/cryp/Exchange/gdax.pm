@@ -32,6 +32,8 @@ sub new {
 
 sub data_native_pair_separator { '-' }
 
+sub data_native_pair_is_uppercase { 1 }
+
 sub data_canonical_currencies {
     state $data = {};
     $data;
@@ -50,21 +52,27 @@ sub list_pairs {
 
     my @res;
     for (@{ $apires->[2] }) {
-        my $pair;
-        if ($args{native}) {
-            $pair = $self->to_native_pair($_->{id});
-        } else {
-            $pair = $self->to_canonical_pair($_->{id});
-        }
-        push @res, {
-            pair            => $pair,
+        my $rec = {
+            name            => $_->{id},
+            base_currency   => $_->{base_currency},
+            quote_currency  => $_->{quote_currency},
+            min_base_size   => $_->{base_min_size},
             quote_increment => $_->{quote_increment},
+
             status          => $_->{status}, # online,
         };
+
+        if ($args{native}) {
+            $rec->{name} = $self->to_native_pair($rec->{name});
+            $rec->{base_currency}  = $self->to_native_pair($rec->{base_currency});
+            $rec->{quote_currency} = $self->to_native_pair($rec->{quote_currency});
+        }
+
+        push @res, $rec;
     }
 
     unless ($args{detail}) {
-        @res = map { $_->{pair} } @res;
+        @res = map { $_->{name} } @res;
     }
 
     [200, "OK", \@res];

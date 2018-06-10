@@ -14,6 +14,7 @@ requires qw(
 
                data_canonical_currencies
                data_native_pair_separator
+               data_native_pair_is_uppercase
                list_balances
                list_pairs
        );
@@ -40,7 +41,8 @@ sub to_native_currency {
     my ($self, $cur) = @_;
     $cur = uc $cur;
     my $cur2 = $self->data_reverse_canonical_currencies->{$cur};
-    $cur2 // $cur;
+    $cur = $cur2 if defined $cur2;
+    $self->data_native_pair_is_uppercase ? $cur : lc $cur;
 }
 
 sub to_canonical_pair {
@@ -157,18 +159,25 @@ Method must return object.
 
 Should return a single-character string.
 
+=head2 data_native_pair_is_uppercase
+
+Should return an integer value, 1 if native pair is in uppercase, 0 if native
+pair is in lowercase.
+
 =head2 data_canonical_currencies
 
 Should return a hashref, a mapping between exchange-native currency codes to
-canonical/standardized currency codes.
+canonical/standardized currency codes. All codes must be in uppercase.
 
 =head2 data_reverse_canonical_currencies
 
 Returns hashref, a mapping of canonical/standardized currency codes to exchange
-native codes. This role already provides an implementation, which calculates the
-hashref by reversing the hash returned by C</"data_canonical_currencies"> and
-caching the result in the instance's C<_reverse_canonical_currencies> key.
-Driver can provide its own implementation.
+native codes. All codes must be in uppercase.
+
+This role already provides an implementation, which calculates the hashref by
+reversing the hash returned by C</"data_canonical_currencies"> and caching the
+result in the instance's C<_reverse_canonical_currencies> key. Driver can
+provide its own implementation.
 
 =head2 list_balances
 
@@ -220,11 +229,12 @@ List all pairs available for trading.
 
 Method must return enveloped result. Payload must be an array containing pair
 names (except when C<detail> argument is set to true, in which case method must
-return array of records/hashrefs).
+return array of records/hashrefs (see the C<detail> option for more details).
 
 Pair names must be in the form of I<< <currency1>/<currency2> >> where
-I<currency1> is cryptocurrency code and I<< <currency2> >> is the base currency
-code (fiat or crypto). Some example pair names: BTC/USD, ETH/BTC.
+I<currency1> is the base currency and must be a cryptocurrency code while I<<
+<currency2> >> is the quote currency and can be a fiat or cryptocurrency code.
+Some example pair names: BTC/USD, ETH/BTC.
 
 Known arguments:
 
@@ -232,16 +242,45 @@ Known arguments:
 
 =item * native
 
-Boolean. Default 0. If set to 1, method must return pair codes in native
-exchange form instead of canonical/standardized form.
+Boolean. Default 0. If set to 1, method must return pair codes and currency
+codes in native exchange form instead of canonical/standardized form.
 
 =item * detail
 
 Boolean. Default 0. If set to 1, method must return array of records/hashrefs
 instead of just array of strings (pair names).
 
-Record must contain these keys: C<name> (pair name, str). Record can contain
-additional keys.
+Record must contain these keys:
+
+=over
+
+=item * name
+
+str, pair name. Affected by the L</"native"> option.
+
+=item * base_currency
+
+str. Affected by the L</"native"> option.
+
+=item * quote_currency
+
+str. Affected by the L</"native"> option.
+
+=item * min_base_size
+
+Num, minimum order amount in the base currency.
+
+=item * min_quote_size
+
+Num, minimum order amount in the quote currency.
+
+=item * quote_increment
+
+Num, minimum increment in the quote currency.
+
+=back
+
+Record can contain additional keys.
 
 =back
 
