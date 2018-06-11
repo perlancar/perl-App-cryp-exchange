@@ -12,9 +12,12 @@ use Role::Tiny;
 requires qw(
                new
 
+               cancel_order
+               create_limit_order
                data_canonical_currencies
                data_native_pair_separator
                data_native_pair_is_uppercase
+               get_order
                list_balances
                list_pairs
        );
@@ -308,13 +311,164 @@ Method should return this payload:
 Buy (bid, purchase) records must be sorted from highest price to lowest price.
 Sell (ask, offer) records must be sorted from lowest price to highest.
 
+Known arguments (C<*> marks required arguments):
+
+=over
+
+=item * pair*
+
+String. Pair.
+
+=back
+
+=head2 create_limit_order
+
+Usage:
+
+ $xchg->create_limit_order(%args) => [$status, $reason, $payload, \%resmeta]
+
+Create a buy/sell order at a specified price.
+
+B<Specifying size (amount)>. When creating a buy order, some exchanges require
+specifying size (amount) in quote currency, e.g. in BTC/USD pair when buying USD
+we specify how much in USD we want to buy bitcoin. Some other exchanges require
+specifying size in base currency, i.e. how many bitcoins we want to buy.
+Similarly, when creating a sell order, some exchanges require specifying base
+currency while others want size in quote currency. B<For flexibility, this role
+method requires drivers to accept either base_size or quote_size.>
+
+B<Minimum_size>. Exchanges have a minimum order size (amount) either in the
+quote currency or base currency or both. Check the C<min_base_size> and
+C<min_quote_size> field returned by L</"list_pairs">. The API server typically
+will reject order when size is less than the minimum.
+
+B<Maximum precision>. Exchanges also have restriction on the maximum precision
+of price (see the C<quote_increment> field returned by L</"list_pairs">. For
+example, if C<quote_increment> for C<BTC/USD> pair is 0.01 then the price
+7000.51 is okay but 7000.526 is too precise. Some exchanges will reject
+overprecise price, but some exchanges will simply round the price to the nearest
+precision (e.g. 7000.524 to 7000.52) and some exchanges might round up or down
+or truncate etc. B<For more consistent behavior, this role method requires
+drivers to round down the overprecise price to the nearest quote increment.>
+
+Known arguments:
+
+Known arguments (C<*> marks required arguments):
+
+=over
+
+=item * pair*
+
+String. Pair.
+
+=item * type*
+
+String. Either "buy" or "sell".
+
+=item * price*
+
+Number. Price in the quote currency. If price is too precise, will be rounded
+down to the nearest precision (see method description above for details).
+
+=item * base_size
+
+Specify amount to buy/sell in base currency. For example, in BTC/USD pair, we
+specify how many bitcoins to buy or sell.
+
+You have to specify one of base_size or quote_size, but not both.
+
+=item * quote_size
+
+Specify amount to buy/sell in quote currency. For example, in BTC/USD pair, we
+specify how many USD to buy or sell bitcoins.
+
+You have to specify one of base_size or quote_size, but not both.
+
+=back
+
+Some exchange drivers might provide additional options.
+
+When successful, payload in response must be a hashref which contains at least
+these keys: C<type> ("buy" or "sell"), C<pair>, C<order_id> (str, usually a
+number, can also be a UUID, etc), C<price> (number, actual price of the order),
+C<base_size> (actual size of the order, specified in base currency),
+C<quote_size> (actual size of the order, specified in quote currency), C<status>
+(current status of the order).
+
+=head2 get_order
+
+Usage:
+
+ $xchg->get_order(%args) => [$status, $reason, $payload, \%resmeta]
+
+Get information about a specific order.
+
+Note that some exchanges do not allow getting information on order that is
+already cancelled or fulfilled.
+
+B<Identifying order.> Some exchanges provide UUID to uniquely identify an order,
+while some others provide a regular integer and you must also specify pair and
+type to uniquely identify a particular order. For consistency, this rule method
+requires driver to ask for all of C<type>, C<pair>, and C<order_id>.
+
 Known arguments:
 
 =over
 
+=item * type*
+
+=item * pair*
+
+=item * order_id*
+
+=back
+
+Payload must be a hashref with at least these keys:
+
+=over
+
+=item * type
+
 =item * pair
 
-String. Pair.
+=item * order_id
+
+=item * create_time
+
+Foat. Unix epoch.
+
+=item * status
+
+Str. E.g.: C<open>, C<cancelled>, C<done>. TODO: standardize status across
+exchanges.
+
+=item * filled_base_size
+
+Number.
+
+=item * filled_quote_size
+
+Number.
+
+=back
+
+=head2 cancel_order
+
+Usage:
+
+ $xchg->cancel_order(%args) => [$status, $reason, $payload, \%resmeta]
+
+Cancel an open order.
+
+Known arguments:
+
+=over
+
+=item * type*
+
+=item * pair*
+
+=item * order_id*
 
 =back
 

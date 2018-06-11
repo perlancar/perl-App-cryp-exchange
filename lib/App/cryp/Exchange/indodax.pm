@@ -6,6 +6,9 @@ package App::cryp::Exchange::indodax;
 use 5.010001;
 use strict;
 use warnings;
+use Log::ger;
+
+use POSIX qw(floor);
 
 use Role::Tiny::With;
 with 'App::cryp::Role::Exchange';
@@ -253,10 +256,11 @@ sub list_pairs {
 sub get_order_book {
     my ($self, %args) = @_;
 
-    my $pair = lc $self->to_native_pair($args{pair});
+    $args{pair} or return [400, "Please specify pair"];
+    my $npair = $self->to_native_pair($args{pair});
 
     my $apires;
-    eval { $apires = $self->{_client}->get_depth(pair => $pair) };
+    eval { $apires = $self->{_client}->get_depth(pair => $npair) };
     return [500, "Died: $@"] if $@;
 
     [200, "OK", $apires];
@@ -283,6 +287,173 @@ sub list_balances {
     }
 
     [200, "OK", \@recs];
+}
+
+sub create_limit_order {
+    my ($self, %args) = @_;
+
+    my $type  = $args{type} or return [400, "Please specify type (buy/sell)"];
+    my $cpair = $args{pair} or return [400, "Please specify pair"];
+    my $npair = $self->to_native_pair($cpair);
+    my ($nbasecur, $nquotecur) = $npair =~ m!(.+)_(.+)!;
+    my $price = $args{price} or return [400, "Please specify price"];
+
+    my %api_args = (
+        type => $args{type},
+        pair => $npair,
+    );
+
+  HANDLE_OVERPRECISE_PRICE:
+    {
+        # indodax rounds price if overprecise, but its rounding behavior is not
+        # consistent. for example, for BTC/IDR the price is rounded DOWN
+        # (truncated) to the nearest 1000 IDR, so 50,123,100 and 50,123,900 both
+        # are rounded to 50,123,000. but for XRP/BTC, the price is rounded to
+        # the nearest. so 0.000012341 becomes 0.00001234 but 0.000012349 becomes
+        # 0.00001235.
+
+        # we fix the behavior as required by the role method: round down.
+
+        my $pairs = $self->data_pairs;
+        my $quote_increment;
+        for my $pair (@$pairs) {
+            if ($pair->{name} eq $cpair) {
+                $quote_increment = $pair->{quote_increment};
+                last;
+            }
+        }
+        die "BUG: Undefined quote increment for pair $cpair"
+            unless $quote_increment;
+        #log_trace "quote_increment: %s", $quote_increment;
+
+        $price = floor($price/$quote_increment) * $quote_increment;
+    }
+    $api_args{price} = $price;
+
+  SPECIFY_SIZE:
+    {
+        my $size;
+        if (defined $args{base_size} && !(defined $args{quote_size})) {
+            $size = $type eq 'buy' ?
+                $args{base_size} * $price : $args{base_size};
+        } elsif (!defined($args{base_size}) && defined $args{quote_size}) {
+            $size = $type eq 'buy' ?
+                $args{quote_size} : $args{quote_size} / $price;
+        } else {
+            return [400, "Please specify either base_size or quote_size"];
+        }
+
+        # handle overprecise size
+        $size = floor($size / 0.00000001) * 0.00000001;
+        $api_args{ $type eq 'buy' ? $nquotecur : $nbasecur } = $size;
+    }
+
+    my $apires;
+    eval { $apires = $self->{_client}->create_order(%api_args) };
+    return [500, "Died during create_order(): $@"] if $@;
+
+    my $order_id = $apires->{return}{order_id}
+        or return [500, "Something bad happened, didn't get order_id"];
+
+    # the create_order API doesn't return enough information that we want, so we
+    # follow with get_order().
+    eval { $apires = $self->{_client}->get_order(
+        type=>$type, pair=>$npair, order_id=>$order_id) };
+    return [500, "Died during get_order(): $@"] if $@;
+
+    $price = $apires->{return}{order}{price};
+    my ($base_size, $quote_size);
+    if ($type eq 'buy') {
+        my $key = "order_" . ($nquotecur eq 'idr' ? 'rp' : $nquotecur);
+        $quote_size = $apires->{return}{order}{$key};
+        $base_size  = $quote_size / $price;
+    } else {
+        my $key = "order_" . $nbasecur;
+        $base_size  = $apires->{return}{order}{$key};
+        $quote_size = $base_size * $price;
+    }
+
+    my $info = {
+        type => $type,
+        pair => $cpair,
+        order_id => $order_id,
+        price => $price,
+        base_size => $base_size,
+        quote_size => $quote_size,
+        status => $apires->{return}{order}{status},
+    };
+
+    [200, "OK", $info];
+}
+
+sub get_order {
+    my ($self, %args) = @_;
+
+    my $type  = $args{type} or return [400, "Please specify type (buy/sell)"];
+    my $cpair = $args{pair} or return [400, "Please specify pair"];
+    my $npair = $self->to_native_pair($cpair);
+    my ($nbasecur, $nquotecur) = $npair =~ m!(.+)_(.+)!;
+    my $order_id = $args{order_id} or return [400, "Please specify order_id"];
+
+    my $apires;
+    eval { $apires = $self->{_client}->get_order(
+        type=>$type, pair=>$npair, order_id=>$order_id) };
+    return [500, "Died: $@"] if $@;
+
+    # catch mistake
+    $type = $apires->{return}{order}{type};
+
+    my $price = $apires->{return}{order}{price};
+
+    my ($base_size, $quote_size, $filled_base_size, $filled_quote_size);
+    if ($type eq 'buy') {
+        my $key = "order_" . ($nquotecur eq 'idr' ? 'rp' : $nquotecur);
+        $quote_size = $apires->{return}{order}{$key};
+        $base_size  = $quote_size / $price;
+        my $rkey = "remain_" . ($nquotecur eq 'idr' ? 'rp' : $nquotecur);
+        $filled_quote_size = $quote_size - $apires->{return}{order}{$key};
+        $filled_base_size  = $filled_quote_size / $price;
+    } else {
+        my $key = "order_" . $nbasecur;
+        $base_size = $apires->{return}{order}{$key};
+        $quote_size = $base_size * $price;
+        my $rkey = "remain_" . $nbasecur;
+        $filled_base_size  = $base_size - $apires->{return}{order}{$key};
+        $filled_quote_size = $filled_base_size * $price;
+    }
+
+    my $info = {
+        type => $type,
+        pair => $cpair,
+        order_id => $order_id,
+        create_time => $apires->{return}{order}{submit_time},
+        price => $price,
+        base_size => $base_size,
+        quote_size => $quote_size,
+        status => $apires->{return}{order}{status},
+        filled_base_size => $filled_base_size,
+        filled_quote_size => $filled_quote_size,
+    };
+
+    [200, "OK", $info];
+
+}
+
+sub cancel_order {
+    my ($self, %args) = @_;
+
+    my $type  = $args{type} or return [400, "Please specify type (buy/sell)"];
+    my $cpair = $args{pair} or return [400, "Please specify pair"];
+    my $npair = $self->to_native_pair($cpair);
+    my ($nbasecur, $nquotecur) = $npair =~ m!(.+)_(.+)!;
+    my $order_id = $args{order_id} or return [400, "Please specify order_id"];
+
+    my $apires;
+    eval { $apires = $self->{_client}->cancel_order(
+        type=>$type, pair=>$npair, order_id=>$order_id) };
+    return [500, "Died: $@"] if $@;
+
+    [200, "OK"];
 }
 
 1;

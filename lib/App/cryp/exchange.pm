@@ -51,6 +51,45 @@ our %arg_type = (
     },
 );
 
+our %arg_req2_type = (
+    type => {
+        schema => ['str*', in=>['buy','sell']],
+        req => 1,
+        pos => 2,
+        cmdline_aliases => {
+            buy  => {is_flag=>1, code=>sub {$_[0]{type}='buy' }, summary=>'Alias for --type=buy' },
+            sell => {is_flag=>1, code=>sub {$_[0]{type}='sell'}, summary=>'Alias for --type=sell'},
+        },
+    },
+);
+
+our %arg_req3_price = (
+    price => {
+        schema => ['float*', xmin=>0],
+        req => 1,
+        pos => 3,
+    },
+);
+
+our %args_size = (
+    base_size => {
+        summary => 'Order amount, denominated in base currency (first currency of the pair)',
+        schema => ['float*', xmin=>0],
+    },
+    quote_size => {
+        summary => 'Order amount, denominated in quote currency (second currency of the pair)',
+        schema => ['float*', xmin=>0],
+    },
+);
+
+our %arg_req3_order_id = (
+    order_id => {
+        schema => ['str*'],
+        req => 1,
+        pos => 3,
+    },
+);
+
 $SPEC{':package'} = {
     v => 1.1,
     summary => 'Interact with cryptoexchanges using a common interface',
@@ -241,6 +280,73 @@ sub balance {
     my $xchg = $r->{_stash}{exchange_client};
 
     $xchg->list_balances;
+}
+
+$SPEC{create_limit_order} = {
+    v => 1.1,
+    summary => 'Create a limit order',
+    args => {
+        %arg_req0_account,
+        %arg_req1_pair,
+        %arg_req2_type,
+        %arg_req3_price,
+        %args_size,
+    },
+    args_rels => {
+        req_one => [qw/base_size quote_size/],
+    },
+};
+sub create_limit_order {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
+
+    $xchg->create_limit_order(%args);
+}
+
+$SPEC{get_order} = {
+    v => 1.1,
+    summary => 'Get information about an order',
+    args => {
+        %arg_req0_account,
+        %arg_req1_pair,
+        %arg_req2_type,
+        %arg_req3_order_id,
+    },
+};
+sub get_order {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
+
+    $xchg->get_order(%args);
+}
+
+$SPEC{cancel_order} = {
+    v => 1.1,
+    summary => 'Cancel an order',
+    args => {
+        %arg_req0_account,
+        %arg_req1_pair,
+        %arg_req2_type,
+        %arg_req3_order_id,
+    },
+};
+sub cancel_order {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
+
+    $xchg->cancel_order(%args);
 }
 
 1;
