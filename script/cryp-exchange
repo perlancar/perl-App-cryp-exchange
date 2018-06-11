@@ -102,12 +102,27 @@ To get account balances:
 
 B<Early release. More functionality will be added in the future.>
 
-This utility (and the corresponding backend modules) provide a common interface
-to interact with various cryptocurrency exchanges: common set of subcommands
-(methods) with common arguments and result format, standardized currency codes
-(following L<CryptoCurrency::Catalog>) and pair formats (e.g. C<BTC/USD>).
+cryp-exchange is a multi-cryptoexchange CLI. This distribution provides common
+interface (as CLI as well as driver modules) to interact with different
+cryptocurrency exchanges including:
+
+=over
+
+=item * common set of subcommands (API methods)
+
+Along with common terminology, arguments, error behavior, and result format.
+
+=item * standardized currency codes and pair formats
+
+Following L<CryptoCurrency::Catalog>.
+
+=back
 
 
 =head1 SEE ALSO
 
 The other C<cryp-*> scripts in the family.
+
+L<CryptoCurrency::Catalog>
+
+L<CryptoExchange::Catalog>
