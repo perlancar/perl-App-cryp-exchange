@@ -1,3 +1,11 @@
+0.007   2018-06-11 (PERLANCAR)
+
+	- [ux] Add coerce rule str_num_en so we can say --price 7,000 etc
+	  instead of just --price 7000.
+
+	- [doc] Fix/update Synopsis.
+
+
 0.006   2018-06-11 (PERLANCAR)
 
 	[INCOMPATIBLE CHANGES]
