@@ -1,3 +1,26 @@
+0.006   2018-06-11 (PERLANCAR)
+
+	[INCOMPATIBLE CHANGES]
+
+        - Rename subcommands: ls-balances -> balances, get-order-book ->
+          orderbook, ls-pairs -> pairs, ls-exchanges -> exchanges, ls-accounts
+          -> accounts.
+
+	[NEW FEATURES]
+
+        - Add subcommands: create-limit-order, get-order, cancel-order.
+
+	[API]
+
+        - list_pairs(): add required record field: base_currency,
+	  quote_currency, min_base_size, min_quote_size, quote_increment.
+
+        [INTERNAL]
+
+        - Make subcommands modular/pluggable, so later we can create
+          App-cryp-exchange-CmdBundle-Whatever.
+
+
 0.005   2018-06-08 (PERLANCAR)
 
 	- gdax: get_order_book: remove num-orders from GDAX API result.
