@@ -10,28 +10,6 @@ use Log::ger;
 
 our %SPEC;
 
-our $_complete_exchange = sub {
-    require Complete::Util;
-    require PERLANCAR::Module::List;
-
-    my %args = @_;
-
-    my $mods = PERLANCAR::Module::List::list_modules(
-        "App::cryp::Exchange::", {list_modules=>1});
-
-    my @safenames;
-    for (sort keys %$mods) {
-        s/.+:://;
-        s/_/-/g;
-        push @safenames, $_;
-    }
-
-    Complete::Util::complete_array_elem(
-        word  => $args{word},
-        array => \@safenames,
-    );
-};
-
 our %arg_detail = (
     detail => {
         schema => 'bool*',
@@ -45,10 +23,9 @@ our %arg_native = (
     },
 );
 
-our %arg_req0_exchange = (
-    exchange => {
-        schema => 'str*',
-        completion => $_complete_exchange,
+our %arg_req0_account = (
+    account => {
+        schema => 'cryptoexchange::account*',
         req => 1,
         pos => 0,
     },
@@ -76,40 +53,42 @@ our %arg_type = (
 
 $SPEC{':package'} = {
     v => 1.1,
-    summary => 'Interact with cryptoexchanges',
+    summary => 'Interact with cryptoexchanges using a common interface',
 };
 
-sub _instantiate_exchange {
-    my ($r, $exchange, $account) = @_;
+sub _init {
+    my ($r) = @_;
 
-    my $mod = "App::cryp::Exchange::$exchange"; $mod =~ s/-/_/g;
-    (my $mod_pm = "$mod.pm") =~ s!::!/!g; require $mod_pm;
+  INSTANTIATE_EXCHANGE_CLIENT:
+    {
+        last unless $r->{args}{account};
+        my ($exchange, $account) = $r->{args}{account} =~ m!(.+)/(.+)!
+            or return [
+                400, "Invalid cryptoexchange account syntax ".
+                    "'$r->{args}{account}', please use EXCHANGE/ACCOUNT ".
+                    "format"];
+        my $mod = "App::cryp::Exchange::$exchange"; $mod =~ s/-/_/g;
+        (my $mod_pm = "$mod.pm") =~ s!::!/!g; require $mod_pm;
 
-    my $crypconf = $r->{_cryp};
+        my $hash = $r->{_cryp}{exchanges}{$exchange}{$account}
+            or return [404, "Unknown $exchange account $account"];
 
-    my %args = (
-    );
+        my %args = map { $_ => $hash->{$_} } grep {/^api_/} keys %$hash;
 
-    my $accounts = $crypconf->{exchanges}{$exchange} // {};
-    for my $a (sort keys %$accounts) {
-        if (!defined($account) || $account eq $a) {
-            for (grep {/^api_/} keys %{ $accounts->{$a} }) {
-                $args{$_} = $accounts->{$a}{$_};
-            }
-            last;
-        }
+        $r->{_stash}{exchange_client} = $mod->new(%args);
     }
-    $mod->new(%args);
+    [200];
 }
 
-$SPEC{list_exchanges} = {
+$SPEC{exchanges} = {
     v => 1.1,
     summary => 'List supported exchanges',
     args => {
         %arg_detail,
     },
+    tags => ['category:etc'],
 };
-sub list_exchanges {
+sub exchanges {
     require PERLANCAR::Module::List;
 
     my %args = @_;
@@ -136,15 +115,16 @@ sub list_exchanges {
     [200, "OK", \@res, $resmeta];
 }
 
-$SPEC{list_accounts} = {
+$SPEC{accounts} = {
     v => 1.1,
     summary => 'List exchange accounts',
     args => {
-        # XXX filter by exchnage (-I, -X)
+        # XXX filter by exchange (-I, -X)
         %arg_detail,
     },
+    tags => ['category:etc'],
 };
-sub list_accounts {
+sub accounts {
     my %args = @_;
 
     my $crypconf = $args{-cmdline_r}{_cryp};
@@ -173,21 +153,22 @@ sub list_accounts {
 
 }
 
-$SPEC{list_pairs} = {
+$SPEC{pairs} = {
     v => 1.1,
     summary => 'List pairs supported by exchange',
     args => {
-        %arg_req0_exchange,
+        %arg_req0_account,
         %arg_detail,
         %arg_native,
     },
 };
-sub list_pairs {
+sub pairs {
     my %args = @_;
 
     my $r = $args{-cmdline_r};
 
-    my $xchg = _instantiate_exchange($r, $args{exchange});
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
 
     $xchg->list_pairs(
         detail => $args{detail},
@@ -195,23 +176,24 @@ sub list_pairs {
     );
 }
 
-$SPEC{get_order_book} = {
+$SPEC{orderbook} = {
     v => 1.1,
     summary => 'Get order book on an exchange',
     args => {
-        %arg_req0_exchange,
+        %arg_req0_account,
         %arg_req1_pair,
         %arg_type,
     },
 };
-sub get_order_book {
+sub orderbook {
     my %args = @_;
 
     my $r = $args{-cmdline_r};
 
-    my $xchg = _instantiate_exchange($r, $args{exchange});
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
 
-    my $res = $xchg->get_order_book(
+    $res = $xchg->get_order_book(
         pair => $args{pair},
     );
     return $res unless $res->[0] == 200;
@@ -243,19 +225,20 @@ sub get_order_book {
     [200, "OK", \@rows];
 }
 
-$SPEC{list_balances} = {
+$SPEC{balance} = {
     v => 1.1,
-    summary => 'List account balances',
+    summary => 'List account balance',
     args => {
-        %arg_req0_exchange,
+        %arg_req0_account,
     },
 };
-sub list_balances {
+sub balance {
     my %args = @_;
 
     my $r = $args{-cmdline_r};
 
-    my $xchg = _instantiate_exchange($r, $args{exchange});
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
 
     $xchg->list_balances;
 }

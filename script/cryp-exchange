@@ -11,24 +11,41 @@ use warnings;
 use Log::ger;
 
 use Perinci::CmdLine::cryp;
+use PERLANCAR::Module::List;
 
 my $prefix = "/App/cryp/exchange/";
+my $mods = do {
+    # if we are being called during the building of our own dist by dzil (e.g.
+    # by Pod::Weaver::Plugin::Rinci), don't include subcommands installed
+    # outside our dist. otherwise we'll be documenting and depending on
+    # extraneous subcommands.
+    local @INC = ("lib")
+        if $ENV{DZIL} &&
+            # DZP:SetEnv always sets DZIL=1 so we need to know if it's our own
+            # dist that we're building
+        (!defined($ENV{DZIL_NAME}) ||
+         $ENV{DZIL_NAME} eq 'App-cryp-exchange');
+
+    PERLANCAR::Module::List::list_modules(
+        "App::cryp::Cmd::Exchange::", {list_modules=>1});
+};
+my $subcommands = {};
+for my $mod (keys %$mods) {
+    (my $sc_name = $mod) =~ s/App::cryp::Cmd::Exchange:://;
+    $sc_name =~ s/_/-/g;
+
+    (my $url = $mod) =~ s!::!/!g;
+    $subcommands->{$sc_name} = {
+        url => "/$url/handle_cmd",
+    };
+}
 
 Perinci::CmdLine::cryp->new(
     url => $prefix,
     log => 1,
     pass_cmdline_object => 1,
     config_filename => ["cryp.conf", "cryp-exchange.conf"],
-    subcommands => {
-        # public
-        "ls-accounts"       => { url => "${prefix}list_accounts", },
-        "ls-exchanges"      => { url => "${prefix}list_exchanges", },
-        "ls-pairs"          => { url => "${prefix}list_pairs", },
-
-        # private
-        "get-order-book"    => { url => "${prefix}get_order_book", },
-        "ls-balances"       => { url => "${prefix}list_balances", },
-    },
+    subcommands => $subcommands,
 )->run;
 
 # ABSTRACT:
@@ -56,24 +73,29 @@ family of scripts):
 
 To list supported exchanges:
 
- % cryp-exchange ls-exchanges
- % cryp-exchange ls-exchanges -l
+ % cryp-exchange exchanges
+ % cryp-exchange exchanges -l
 
 To list pairs offered in an exchange:
 
- % cryp-exchange ls-pairs bitcoin-indonesia
- % cryp-exchange ls-pairs gdax -l
+ % cryp-exchange pairs indodax
+ % cryp-exchange pairs gdax/wife -l
 
 To list accounts:
 
- % cryp-exchange ls-accounts
- % cryp-exchange ls-accounts -l
- % cryp-exchange ls-accounts -I gdax -l ;# only accounts on gdax
- % cryp-exchange ls-accounts -X gdax -l ;# all accounts except those on gdax
+ % cryp-exchange accounts
+ % cryp-exchange accounts -l
+ % cryp-exchange accounts -I gdax -l ;# only accounts on gdax
+ % cryp-exchange accounts -X gdax -l ;# all accounts except those on gdax
 
 To get order book:
 
- % cryp-exchange get-order-book gdax
+ % cryp-exchange orderbook gdax
+
+To get account balances:
+
+ % cryp-exchange balance gdax
+ % cryp-exchange balance gdax/wife
 
 
 =head1 DESCRIPTION
