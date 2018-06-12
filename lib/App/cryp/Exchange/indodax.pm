@@ -464,23 +464,23 @@ sub list_open_orders {
     my ($self, %args) = @_;
 
     my $cpair = $args{pair};
-    my $npair; $npair = $self->to_native_pair($cpair) if $cpair;
+    my $npair_arg; $npair_arg = $self->to_native_pair($cpair) if $cpair;
 
     my $apires;
     eval { $apires = $self->{_client}->get_open_orders(
-        (pair => $npair) x !!$npair) };
+        (pair => $npair_arg) x !!$npair_arg) };
     return [500, "Died: $@"] if $@;
 
     my @orders;
 
     my $all_orders; # hashref, key=cpair, value=orders
-    if ($npair) {
-        $all_orders = {$npair => $apires->{return}{orders}};
+    if ($npair_arg) {
+        $all_orders = {$npair_arg => $apires->{return}{orders}};
     } else {
         $all_orders = $apires->{return}{orders};
     }
 
-    for $npair (sort keys %$all_orders) {
+    for my $npair (sort keys %$all_orders) {
         my $orders0 = $all_orders->{$npair};
         for my $order0 (@$orders0) {
             my ($nbasecur, $nquotecur) = split /_/, $npair;

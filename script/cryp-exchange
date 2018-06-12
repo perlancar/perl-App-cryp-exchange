@@ -72,6 +72,8 @@ family of scripts):
  api_secret     = 9B8T2nPFMRUiUIKA82txjaO09iNnJXBMVMdkDgJ0i2YambYKQY8DZAS54ERZE0sE2lzYrpTWfpU7/110xfesZluY
  api_passphrase = gdllszgwO774NN
 
+=head2 General
+
 To list supported exchanges:
 
  % cryp-exchange exchanges
@@ -89,14 +91,46 @@ To list accounts:
  % cryp-exchange accounts -I gdax -l ;# only accounts on gdax
  % cryp-exchange accounts -X gdax -l ;# all accounts except those on gdax
 
+To view ticker (last 24h price and volume information):
+
+ % cryp-exchange ticker gdax BTC/USD
+
 To get order book:
 
  % cryp-exchange orderbook gdax
 
-To get account balances:
+=head2 Balance
+
+To get account balance:
 
  % cryp-exchange balance gdax
  % cryp-exchange balance indodax/wifey
+
+=head2 Order
+
+To create a limit order:
+
+ # buy 100USD worth of BTC at 7000USD/BTC
+ % cryp-exchange create-limit-order gdax BTC/USD buy 7500 --quote-size 100
+
+ # buy 0.5BTC at 7000USD/BTC
+ % cryp-exchange create-limit-order gdax BTC/USD buy 7500 --base-size 0.5
+
+To get information about an order:
+
+ % cryp-exchange get-order gdax BTC/USD buy 6327a864-d2c8-4e3e-8de3-dd71921b7cd0
+
+To list open orders:
+
+ # list all open orders
+ % cryp-exchange open-orders gdax
+
+ # list open orders for a specific pair only
+ % cryp-exchange open-orders gdax BTC/USD
+
+To cancel an order:
+
+ % cryp-exchange cancel-order gdax BTC/USD buy 6327a864-d2c8-4e3e-8de3-dd71921b7cd0
 
 
 =head1 DESCRIPTION
