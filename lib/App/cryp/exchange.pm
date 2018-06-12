@@ -10,6 +10,14 @@ use Log::ger;
 
 our %SPEC;
 
+our %arg_req0_account = (
+    account => {
+        schema => 'cryptoexchange::account*',
+        req => 1,
+        pos => 0,
+    },
+);
+
 our %arg_detail = (
     detail => {
         schema => 'bool*',
@@ -23,11 +31,11 @@ our %arg_native = (
     },
 );
 
-our %arg_req0_account = (
-    account => {
-        schema => 'cryptoexchange::account*',
+our %arg_req3_order_id = (
+    order_id => {
+        schema => ['str*'],
         req => 1,
-        pos => 0,
+        pos => 3,
     },
 );
 
@@ -44,6 +52,25 @@ our %arg_req1_pair = (
         # XXX completion
         req => 1,
         pos => 1,
+    },
+);
+
+our %arg_req3_price = (
+    price => {
+        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['str_num_en']],
+        req => 1,
+        pos => 3,
+    },
+);
+
+our %args_size = (
+    base_size => {
+        summary => 'Order amount, denominated in base currency (first currency of the pair)',
+        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['str_num_en']],
+    },
+    quote_size => {
+        summary => 'Order amount, denominated in quote currency (second currency of the pair)',
+        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['str_num_en']],
     },
 );
 
@@ -67,33 +94,6 @@ our %arg_req2_type = (
             buy  => {is_flag=>1, code=>sub {$_[0]{type}='buy' }, summary=>'Alias for --type=buy' },
             sell => {is_flag=>1, code=>sub {$_[0]{type}='sell'}, summary=>'Alias for --type=sell'},
         },
-    },
-);
-
-our %arg_req3_price = (
-    price => {
-        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['str_num_en']],
-        req => 1,
-        pos => 3,
-    },
-);
-
-our %args_size = (
-    base_size => {
-        summary => 'Order amount, denominated in base currency (first currency of the pair)',
-        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['str_num_en']],
-    },
-    quote_size => {
-        summary => 'Order amount, denominated in quote currency (second currency of the pair)',
-        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['str_num_en']],
-    },
-);
-
-our %arg_req3_order_id = (
-    order_id => {
-        schema => ['str*'],
-        req => 1,
-        pos => 3,
     },
 );
 
@@ -124,41 +124,6 @@ sub _init {
         $r->{_stash}{exchange_client} = $mod->new(%args);
     }
     [200];
-}
-
-$SPEC{exchanges} = {
-    v => 1.1,
-    summary => 'List supported exchanges',
-    args => {
-        %arg_detail,
-    },
-    tags => ['category:etc'],
-};
-sub exchanges {
-    require PERLANCAR::Module::List;
-
-    my %args = @_;
-
-    my $mods = PERLANCAR::Module::List::list_modules(
-        "App::cryp::Exchange::", {list_modules=>1});
-
-    my @res;
-    for my $mod (sort keys %$mods) {
-        my ($safename) = $mod =~ /::(\w+)\z/;
-        $safename =~ s/_/-/g;
-        push @res, {
-            safename => $safename,
-        };
-    }
-
-    unless ($args{detail}) {
-        @res = map {$_->{safename}} @res;
-    }
-
-    my $resmeta = {
-    };
-
-    [200, "OK", \@res, $resmeta];
 }
 
 $SPEC{accounts} = {
@@ -199,16 +164,14 @@ sub accounts {
 
 }
 
-$SPEC{pairs} = {
+$SPEC{balance} = {
     v => 1.1,
-    summary => 'List pairs supported by exchange',
+    summary => 'List account balance',
     args => {
         %arg_req0_account,
-        %arg_detail,
-        %arg_native,
     },
 };
-sub pairs {
+sub balance {
     my %args = @_;
 
     my $r = $args{-cmdline_r};
@@ -216,10 +179,128 @@ sub pairs {
     my $res = _init($r); return $res unless $res->[0] == 200;
     my $xchg = $r->{_stash}{exchange_client};
 
-    $xchg->list_pairs(
-        detail => $args{detail},
-        native => $args{native},
-    );
+    $xchg->list_balances;
+}
+
+$SPEC{cancel_order} = {
+    v => 1.1,
+    summary => 'Cancel an order',
+    args => {
+        %arg_req0_account,
+        %arg_req1_pair,
+        %arg_req2_type,
+        %arg_req3_order_id,
+    },
+};
+sub cancel_order {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
+
+    $xchg->cancel_order(%args);
+}
+
+$SPEC{create_limit_order} = {
+    v => 1.1,
+    summary => 'Create a limit order',
+    args => {
+        %arg_req0_account,
+        %arg_req1_pair,
+        %arg_req2_type,
+        %arg_req3_price,
+        %args_size,
+    },
+    args_rels => {
+        req_one => [qw/base_size quote_size/],
+    },
+};
+sub create_limit_order {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
+
+    $xchg->create_limit_order(%args);
+}
+
+$SPEC{exchanges} = {
+    v => 1.1,
+    summary => 'List supported exchanges',
+    args => {
+        %arg_detail,
+    },
+    tags => ['category:etc'],
+};
+sub exchanges {
+    require PERLANCAR::Module::List;
+
+    my %args = @_;
+
+    my $mods = PERLANCAR::Module::List::list_modules(
+        "App::cryp::Exchange::", {list_modules=>1});
+
+    my @res;
+    for my $mod (sort keys %$mods) {
+        my ($safename) = $mod =~ /::(\w+)\z/;
+        $safename =~ s/_/-/g;
+        push @res, {
+            safename => $safename,
+        };
+    }
+
+    unless ($args{detail}) {
+        @res = map {$_->{safename}} @res;
+    }
+
+    my $resmeta = {
+    };
+
+    [200, "OK", \@res, $resmeta];
+}
+
+$SPEC{get_order} = {
+    v => 1.1,
+    summary => 'Get information about an order',
+    args => {
+        %arg_req0_account,
+        %arg_req1_pair,
+        %arg_req2_type,
+        %arg_req3_order_id,
+    },
+};
+sub get_order {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
+
+    $xchg->get_order(%args);
+}
+
+$SPEC{open_orders} = {
+    v => 1.1,
+    summary => "List open orders",
+    args => {
+        %arg_req0_account,
+        %arg_1_pair,
+    },
+};
+sub open_orders {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
+
+    $xchg->list_open_orders(%args);
 }
 
 $SPEC{orderbook} = {
@@ -271,14 +352,16 @@ sub orderbook {
     [200, "OK", \@rows];
 }
 
-$SPEC{balance} = {
+$SPEC{pairs} = {
     v => 1.1,
-    summary => 'List account balance',
+    summary => 'List pairs supported by exchange',
     args => {
         %arg_req0_account,
+        %arg_detail,
+        %arg_native,
     },
 };
-sub balance {
+sub pairs {
     my %args = @_;
 
     my $r = $args{-cmdline_r};
@@ -286,74 +369,10 @@ sub balance {
     my $res = _init($r); return $res unless $res->[0] == 200;
     my $xchg = $r->{_stash}{exchange_client};
 
-    $xchg->list_balances;
-}
-
-$SPEC{create_limit_order} = {
-    v => 1.1,
-    summary => 'Create a limit order',
-    args => {
-        %arg_req0_account,
-        %arg_req1_pair,
-        %arg_req2_type,
-        %arg_req3_price,
-        %args_size,
-    },
-    args_rels => {
-        req_one => [qw/base_size quote_size/],
-    },
-};
-sub create_limit_order {
-    my %args = @_;
-
-    my $r = $args{-cmdline_r};
-
-    my $res = _init($r); return $res unless $res->[0] == 200;
-    my $xchg = $r->{_stash}{exchange_client};
-
-    $xchg->create_limit_order(%args);
-}
-
-$SPEC{get_order} = {
-    v => 1.1,
-    summary => 'Get information about an order',
-    args => {
-        %arg_req0_account,
-        %arg_req1_pair,
-        %arg_req2_type,
-        %arg_req3_order_id,
-    },
-};
-sub get_order {
-    my %args = @_;
-
-    my $r = $args{-cmdline_r};
-
-    my $res = _init($r); return $res unless $res->[0] == 200;
-    my $xchg = $r->{_stash}{exchange_client};
-
-    $xchg->get_order(%args);
-}
-
-$SPEC{cancel_order} = {
-    v => 1.1,
-    summary => 'Cancel an order',
-    args => {
-        %arg_req0_account,
-        %arg_req1_pair,
-        %arg_req2_type,
-        %arg_req3_order_id,
-    },
-};
-sub cancel_order {
-    my %args = @_;
-
-    my $r = $args{-cmdline_r};
-
-    my $res = _init($r); return $res unless $res->[0] == 200;
-    my $xchg = $r->{_stash}{exchange_client};
-
-    $xchg->cancel_order(%args);
+    $xchg->list_pairs(
+        detail => $args{detail},
+        native => $args{native},
+    );
 }
 
 $SPEC{ticker} = {
@@ -373,25 +392,6 @@ sub ticker {
     my $xchg = $r->{_stash}{exchange_client};
 
     $xchg->get_ticker(%args);
-}
-
-$SPEC{open_orders} = {
-    v => 1.1,
-    summary => "List open orders",
-    args => {
-        %arg_req0_account,
-        %arg_1_pair,
-    },
-};
-sub open_orders {
-    my %args = @_;
-
-    my $r = $args{-cmdline_r};
-
-    my $res = _init($r); return $res unless $res->[0] == 200;
-    my $xchg = $r->{_stash}{exchange_client};
-
-    $xchg->list_open_orders(%args);
 }
 
 1;
