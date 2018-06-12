@@ -31,6 +31,13 @@ our %arg_req0_account = (
     },
 );
 
+our %arg_1_pair = (
+    pair => {
+        schema => 'str*',
+        pos => 1,
+    },
+);
+
 our %arg_req1_pair = (
     pair => {
         schema => 'str*',
@@ -366,6 +373,25 @@ sub ticker {
     my $xchg = $r->{_stash}{exchange_client};
 
     $xchg->get_ticker(%args);
+}
+
+$SPEC{open_orders} = {
+    v => 1.1,
+    summary => "List open orders",
+    args => {
+        %arg_req0_account,
+        %arg_1_pair,
+    },
+};
+sub open_orders {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
+
+    $xchg->list_open_orders(%args);
 }
 
 1;

@@ -460,6 +460,66 @@ sub list_balances {
     [200, "OK", \@recs];
 }
 
+sub list_open_orders {
+    my ($self, %args) = @_;
+
+    my $cpair = $args{pair};
+    my $npair; $npair = $self->to_native_pair($cpair) if $cpair;
+
+    my $apires;
+    eval { $apires = $self->{_client}->get_open_orders(
+        (pair => $npair) x !!$npair) };
+    return [500, "Died: $@"] if $@;
+
+    my @orders;
+
+    my $all_orders; # hashref, key=cpair, value=orders
+    if ($npair) {
+        $all_orders = {$npair => $apires->{return}{orders}};
+    } else {
+        $all_orders = $apires->{return}{orders};
+    }
+
+    for $npair (sort keys %$all_orders) {
+        my $orders0 = $all_orders->{$npair};
+        for my $order0 (@$orders0) {
+            my ($nbasecur, $nquotecur) = split /_/, $npair;
+
+            my ($base_size, $quote_size, $filled_base_size, $filled_quote_size);
+            if ($order0->{type} eq 'buy') {
+                my $key = "order_" . $nquotecur;
+                $quote_size = $order0->{$key};
+                $base_size  = $quote_size / $order0->{price};
+                my $rkey = "remain_" . $nquotecur;
+                $filled_quote_size = $quote_size - $order0->{$key};
+                $filled_base_size  = $filled_quote_size / $order0->{price};
+            } else {
+                my $key = "order_" . $nbasecur;
+                $base_size = $order0->{$key};
+                $quote_size = $base_size * $order0->{price};
+                my $rkey = "remain_" . $nbasecur;
+                $filled_base_size  = $base_size - $order0->{$key};
+                $filled_quote_size = $filled_base_size * $order0->{price};
+            }
+
+            my $order = {
+                type => $order0->{type},
+                pair => $self->to_canonical_pair($npair),
+                order_id => $order0->{order_id},
+                price => $order0->{price},
+                create_time => $order0->{submit_time},
+                status => "open",
+                base_size => $base_size,
+                quote_size => $quote_size,
+                filled_base_size => $filled_base_size,
+                filled_quote_size => $filled_quote_size,
+            };
+            push @orders, $order;
+        }
+    }
+    [200, "OK", \@orders];
+}
+
 sub list_pairs {
     my ($self, %args) = @_;
 

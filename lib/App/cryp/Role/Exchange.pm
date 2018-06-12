@@ -320,12 +320,16 @@ Payload must be a hashref with at least these keys:
 
 =item * create_time
 
-Foat. Unix epoch.
+Float. Unix epoch.
 
 =item * status
 
 Str. E.g.: C<open>, C<cancelled>, C<done>. TODO: standardize status across
 exchanges.
+
+=item * base_size
+
+=item * quote_size
 
 =item * filled_base_size
 
@@ -410,6 +414,55 @@ recently been deposited but unconfirmed e.g. has not reached the minimum number
 of confirmations).
 
 Hashref may contain additional keys.
+
+=head2 list_open_orders
+
+Usage:
+
+ $xchg->list_open_orders(%args) => [$status, $reason, $payload, \%resmeta]
+
+List all open orders.
+
+Known arguments (C<*> marks required arguments):
+
+=over
+
+=item * pair
+
+Only list orders for a specific pair. It's a good idea to include this argument
+if you only need a specific pair's orders because in some exchanges you need a
+separate API call for each pair.
+
+=back
+
+When successful, the payload in response is an array of orders. Each order
+information is a hashref, with the following required keys (see L</"get_order">
+for more details on each key):
+
+=over
+
+=item * type
+
+=item * pair
+
+=item * order_id
+
+=item * price
+
+=item * create_time
+
+=item * status
+
+=item * base_size
+
+=item * filled_base_size
+
+=item * filled_quote_size
+
+=back
+
+Note: the role does not require the orders to be returned in a specific sorting
+order.
 
 =head2 list_pairs
 

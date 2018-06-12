@@ -145,8 +145,7 @@ sub get_order {
     my ($self, %args) = @_;
 
     my $type = $args{type} or return [400, "Please specify type (buy/sell)"];
-    my $pair = $args{pair} or return [400, "Please specify pair"];
-    my ($basecur, $quotecur) = $pair =~ m!(.+)/(.+)!;
+    my $cpair = $args{pair} or return [400, "Please specify pair"];
     my $order_id = $args{order_id} or return [400, "Please specify order_id"];
 
     my $apires = $self->{_client}->private_request(GET => "/orders/$order_id");
@@ -154,11 +153,13 @@ sub get_order {
 
     my $info = {
         type => $type,
-        pair => $pair,
+        pair => $cpair,
         order_id => $order_id,
         price => $apires->[2]{price},
         create_time => __parse_time($apires->[2]{created_at}),
         status => $apires->[2]{status},
+        base_size => $apires->[2]{size},
+        quote_size => $apires->[2]{size} * $apires->[2]{price},
         filled_base_size => $apires->[2]{filled_size},
         filled_quote_size => $apires->[2]{filled_size} * $apires->[2]{price},
     };
@@ -236,6 +237,35 @@ sub list_balances {
     }
 
     [200, "OK", \@res];
+}
+
+sub list_open_orders {
+    my ($self, %args) = @_;
+
+    my $cpair = $args{pair};
+    my $npair; $npair = $self->to_native_pair($cpair) if $cpair;
+
+    my $apires = $self->{_client}->private_request(GET => "/orders".($npair ? "?product_id=$npair" : ""));
+    return $apires unless $apires->[0] == 200;
+
+    my @orders;
+
+    for my $order0 (@{ $apires->[2] }) {
+        my $order = {
+            type => $order0->{side},
+            pair => $self->to_canonical_pair($order0->{product_id}),
+            order_id => $order0->{id},
+            price => $order0->{price},
+            create_time => __parse_time($order0->{created_at}),
+            status => $order0->{status},
+            base_size => $order0->{size},
+            quote_size => $order0->{size} * $order0->{price},
+            filled_base_size => $order0->{filled_size},
+            filled_quote_size => $order0->{filled_size} * $order0->{price},
+        };
+        push @orders, $order;
+    }
+    [200, "OK", \@orders];
 }
 
 sub list_pairs {
