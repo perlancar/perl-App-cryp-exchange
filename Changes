@@ -1,3 +1,9 @@
+0.009   2018-06-13 (PERLANCAR)
+
+	- [ux] balance, open-orders, orderbook, pairs: Formatting of
+	  result.
+
+
 0.008   2018-06-13 (PERLANCAR)
 
         - Add subcommands: ticker, open-orders.
