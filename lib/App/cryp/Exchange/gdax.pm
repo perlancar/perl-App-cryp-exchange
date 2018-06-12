@@ -13,6 +13,16 @@ use POSIX qw(floor);
 use Role::Tiny::With;
 with 'App::cryp::Role::Exchange';
 
+sub __parse_time {
+    state $parser = do {
+        require DateTime::Format::ISO8601;
+        DateTime::Format::ISO8601->new;
+    };
+    my $dt = $parser->parse_datetime($_[0]);
+    return undef unless $dt;
+    $dt->epoch;
+}
+
 sub new {
     require Finance::GDAX::Lite;
 
@@ -33,103 +43,18 @@ sub new {
     bless \%args, $class;
 }
 
-sub data_native_pair_separator { '-' }
-
-sub data_native_pair_is_uppercase { 1 }
-
-sub data_canonical_currencies {
-    state $data = {};
-    $data;
-}
-
-sub data_reverse_canonical_currencies {
-    state $data = {};
-    $data;
-}
-
-sub list_pairs {
+sub cancel_order {
     my ($self, %args) = @_;
 
-    my $apires = $self->{_client}->public_request(GET => "/products");
+    my $type = $args{type} or return [400, "Please specify type (buy/sell)"];
+    my $pair = $args{pair} or return [400, "Please specify pair"];
+    my ($basecur, $quotecur) = $pair =~ m!(.+)/(.+)!;
+    my $order_id = $args{order_id} or return [400, "Please specify order_id"];
+
+    my $apires = $self->{_client}->private_request(DELETE => "/orders/$order_id");
     return $apires unless $apires->[0] == 200;
 
-    my @res;
-    for (@{ $apires->[2] }) {
-        my $cpair = $self->to_canonical_pair($_->{id});
-        my $rec = {
-            name            => $cpair,
-            base_currency   => $_->{base_currency},
-            quote_currency  => $_->{quote_currency},
-            min_base_size   => $_->{base_min_size},
-            quote_increment => $_->{quote_increment},
-
-            status          => $_->{status}, # online,
-        };
-
-        if ($args{native}) {
-            $rec->{name} = $self->to_native_pair($rec->{name});
-            $rec->{base_currency}  = $self->to_native_pair($rec->{base_currency});
-            $rec->{quote_currency} = $self->to_native_pair($rec->{quote_currency});
-        }
-
-        push @res, $rec;
-    }
-
-    unless ($args{detail}) {
-        @res = map { $_->{name} } @res;
-    }
-
-    [200, "OK", \@res];
-}
-
-sub get_order_book {
-    my ($self, %args) = @_;
-
-    $args{pair} or return [400, "Please specify pair"];
-    my $npair = $self->to_native_pair($args{pair});
-
-    my $apires = $self->{_client}->public_request(GET => "/products/$npair/book?level=2");
-    return $apires unless $apires->[0] == 200;
-
-    $apires->[2]{buy}  = delete $apires->[2]{bids};
-    $apires->[2]{sell} = delete $apires->[2]{asks};
-
-    # remove the num-orders part
-    for (@{ $apires->[2]{buy} }, @{ $apires->[2]{sell} }) {
-        splice @$_, 2;
-    }
-
-    [200, "OK", $apires->[2]];
-}
-
-sub list_balances {
-    my ($self, %args) = @_;
-
-    my $apires = $self->{_client}->private_request(GET => "/accounts");
-    return $apires unless $apires->[0] == 200;
-
-    my @res;
-    for (@{ $apires->[2] }) {
-        my $rec = {
-            currency  => $self->to_canonical_currency($_->{currency}),
-            available => $_->{available},
-            hold      => $_->{hold},
-            total     => $_->{balance},
-        };
-        push @res, $rec;
-    }
-
-    [200, "OK", \@res];
-}
-
-sub __parse_time {
-    state $parser = do {
-        require DateTime::Format::ISO8601;
-        DateTime::Format::ISO8601->new;
-    };
-    my $dt = $parser->parse_datetime($_[0]);
-    return undef unless $dt;
-    $dt->epoch;
+    [200, "OK"];
 }
 
 my $cache_list_pairs;
@@ -202,6 +127,20 @@ sub create_limit_order {
     [200, "OK", $info];
 }
 
+sub data_canonical_currencies {
+    state $data = {};
+    $data;
+}
+
+sub data_native_pair_is_uppercase { 1 }
+
+sub data_native_pair_separator { '-' }
+
+sub data_reverse_canonical_currencies {
+    state $data = {};
+    $data;
+}
+
 sub get_order {
     my ($self, %args) = @_;
 
@@ -227,22 +166,82 @@ sub get_order {
     [200, "OK", $info];
 }
 
-sub cancel_order {
+sub get_order_book {
     my ($self, %args) = @_;
 
-    my $type = $args{type} or return [400, "Please specify type (buy/sell)"];
-    my $pair = $args{pair} or return [400, "Please specify pair"];
-    my ($basecur, $quotecur) = $pair =~ m!(.+)/(.+)!;
-    my $order_id = $args{order_id} or return [400, "Please specify order_id"];
+    $args{pair} or return [400, "Please specify pair"];
+    my $npair = $self->to_native_pair($args{pair});
 
-    my $apires = $self->{_client}->private_request(DELETE => "/orders/$order_id");
+    my $apires = $self->{_client}->public_request(GET => "/products/$npair/book?level=2");
     return $apires unless $apires->[0] == 200;
 
-    [200, "OK"];
+    $apires->[2]{buy}  = delete $apires->[2]{bids};
+    $apires->[2]{sell} = delete $apires->[2]{asks};
+
+    # remove the num-orders part
+    for (@{ $apires->[2]{buy} }, @{ $apires->[2]{sell} }) {
+        splice @$_, 2;
+    }
+
+    [200, "OK", $apires->[2]];
 }
 
+sub list_balances {
+    my ($self, %args) = @_;
+
+    my $apires = $self->{_client}->private_request(GET => "/accounts");
+    return $apires unless $apires->[0] == 200;
+
+    my @res;
+    for (@{ $apires->[2] }) {
+        my $rec = {
+            currency  => $self->to_canonical_currency($_->{currency}),
+            available => $_->{available},
+            hold      => $_->{hold},
+            total     => $_->{balance},
+        };
+        push @res, $rec;
+    }
+
+    [200, "OK", \@res];
+}
+
+sub list_pairs {
+    my ($self, %args) = @_;
+
+    my $apires = $self->{_client}->public_request(GET => "/products");
+    return $apires unless $apires->[0] == 200;
+
+    my @res;
+    for (@{ $apires->[2] }) {
+        my $cpair = $self->to_canonical_pair($_->{id});
+        my $rec = {
+            name            => $cpair,
+            base_currency   => $_->{base_currency},
+            quote_currency  => $_->{quote_currency},
+            min_base_size   => $_->{base_min_size},
+            quote_increment => $_->{quote_increment},
+
+            status          => $_->{status}, # online,
+        };
+
+        if ($args{native}) {
+            $rec->{name} = $self->to_native_pair($rec->{name});
+            $rec->{base_currency}  = $self->to_native_pair($rec->{base_currency});
+            $rec->{quote_currency} = $self->to_native_pair($rec->{quote_currency});
+        }
+
+        push @res, $rec;
+    }
+
+    unless ($args{detail}) {
+        @res = map { $_->{name} } @res;
+    }
+
+    [200, "OK", \@res];
+}
 
 1;
-# ABSTRACT: Interact with Bitcoin Indonesia
+# ABSTRACT: Interact with GDAX
 
 =for Pod::Coverage ^(.+)$
