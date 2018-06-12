@@ -141,7 +141,7 @@ Usage:
 
 Cancel an open order.
 
-Known arguments:
+Known arguments (C<*> marks required arguments):
 
 =over
 
@@ -182,8 +182,6 @@ overprecise price, but some exchanges will simply round the price to the nearest
 precision (e.g. 7000.524 to 7000.52) and some exchanges might round up or down
 or truncate etc. B<For more consistent behavior, this role method requires
 drivers to round down the overprecise price to the nearest quote increment.>
-
-Known arguments:
 
 Known arguments (C<*> marks required arguments):
 
@@ -226,6 +224,30 @@ number, can also be a UUID, etc), C<price> (number, actual price of the order),
 C<base_size> (actual size of the order, specified in base currency),
 C<quote_size> (actual size of the order, specified in quote currency), C<status>
 (current status of the order).
+
+=head2 get_ticker
+
+Usage:
+
+ $xchg->get_ticker(%args) => [$status, $reason, $payload, \%resmeta]
+
+Get a pair's last 24h price and volume information.
+
+Known arguments (C<*> marks required arguments):
+
+=over
+
+=item * pair*
+
+=back
+
+When successful, payload in response must be a hashref which contains at least
+these keys: C<high> (last 24h highest price), C<low> (last 24h lowest price),
+C<last> (last trade's price), C<volume> (last 24h volume, in base currency),
+C<buy> (last buy price), C<sell> (last sell price). Optional keys: C<open> (last
+24h opening/first price), , C<quote_volume> (last 24h volume in quote currency).
+Hash may contain additional keys. All prices are in quote currency, all volumes
+(except C>quote_volume>) are in base currency.
 
 =head2 data_canonical_currencies
 
@@ -274,7 +296,7 @@ while some others provide a regular integer and you must also specify pair and
 type to uniquely identify a particular order. For consistency, this rule method
 requires driver to ask for all of C<type>, C<pair>, and C<order_id>.
 
-Known arguments:
+Known arguments (C<*> marks required arguments):
 
 =over
 
@@ -406,7 +428,7 @@ I<currency1> is the base currency and must be a cryptocurrency code while I<<
 <currency2> >> is the quote currency and can be a fiat or cryptocurrency code.
 Some example pair names: BTC/USD, ETH/BTC.
 
-Known arguments:
+Known arguments (C<*> marks required arguments):
 
 =over
 
@@ -460,7 +482,7 @@ Usage:
 
  new(%args) => obj
 
-Constructor. Known arguments:
+Constructor. Known arguments (C<*> marks required arguments):
 
 =over
 

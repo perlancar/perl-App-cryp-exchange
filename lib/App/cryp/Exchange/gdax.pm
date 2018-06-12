@@ -186,6 +186,38 @@ sub get_order_book {
     [200, "OK", $apires->[2]];
 }
 
+sub get_ticker {
+    my ($self, %args) = @_;
+
+    $args{pair} or return [400, "Please specify pair"];
+    my $npair = $self->to_native_pair($args{pair});
+
+    my $ticker = {};
+
+    my $apires;
+
+    $apires = $self->{_client}->public_request(GET => "/products/$npair/stats");
+    return [$apires->[0], "Failed getting product ticker: $apires->[1]"]
+        unless $apires->[0] == 200;
+    # required information
+    $ticker->{high}   = $apires->[2]{high};
+    $ticker->{low}    = $apires->[2]{low};
+    $ticker->{volume} = $apires->[2]{volume};
+
+    # optional information
+    $ticker->{open}   = $apires->[2]{open};
+
+    $apires = $self->{_client}->public_request(GET => "/products/$npair/ticker");
+    return [$apires->[0], "Failed getting product ticker: $apires->[1]"]
+        unless $apires->[0] == 200;
+    # required information
+    $ticker->{last}   = $apires->[2]{price};
+    $ticker->{buy}    = $apires->[2]{bid};
+    $ticker->{sell}   = $apires->[2]{ask};
+
+    [200, "OK", $ticker];
+}
+
 sub list_balances {
     my ($self, %args) = @_;
 
@@ -245,3 +277,9 @@ sub list_pairs {
 # ABSTRACT: Interact with GDAX
 
 =for Pod::Coverage ^(.+)$
+
+=head1 DRIVER-SPECIFIC NOTES
+
+C<get_ticker()> is implemented by calling 2 separate API's,
+/products/<product-id>/stats (for C<open>/C<high>/C<low>/C<volume> information)
+and /products/<product-id>/ticker (for C<last>/C<buy>/C<sell> information).

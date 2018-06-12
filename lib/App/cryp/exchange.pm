@@ -349,6 +349,25 @@ sub cancel_order {
     $xchg->cancel_order(%args);
 }
 
+$SPEC{ticker} = {
+    v => 1.1,
+    summary => "Get a pair's ticker (last 24h price & volume information)",
+    args => {
+        %arg_req0_account,
+        %arg_req1_pair,
+    },
+};
+sub ticker {
+    my %args = @_;
+
+    my $r = $args{-cmdline_r};
+
+    my $res = _init($r); return $res unless $res->[0] == 200;
+    my $xchg = $r->{_stash}{exchange_client};
+
+    $xchg->get_ticker(%args);
+}
+
 1;
 # ABSTRACT:
 

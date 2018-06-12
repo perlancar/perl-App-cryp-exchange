@@ -409,6 +409,34 @@ sub get_order_book {
     [200, "OK", $apires];
 }
 
+sub get_ticker {
+    my ($self, %args) = @_;
+
+    $args{pair} or return [400, "Please specify pair"];
+    my $npair = $self->to_native_pair($args{pair});
+    my ($basecur, $quotecur) = split /_/, $npair;
+
+    my $ticker = {};
+
+    my $apires;
+
+    eval { $apires = $self->{_client}->get_ticker(pair=>$npair) };
+    return [500, "Died: $@"] if $@;
+
+    # required information
+    $ticker->{high}   = $apires->{ticker}{high};
+    $ticker->{low}    = $apires->{ticker}{low};
+    $ticker->{last}   = $apires->{ticker}{"last"};
+    $ticker->{volume} = $apires->{ticker}{"vol_$basecur"};
+    $ticker->{buy}    = $apires->{ticker}{buy};
+    $ticker->{sell}   = $apires->{ticker}{sell};
+
+    # optional information
+    $ticker->{quote_volume} = $apires->{ticker}{"vol_$quotecur"};
+
+    [200, "OK", $ticker];
+}
+
 sub list_balances {
     my ($self, %args) = @_;
 
@@ -462,6 +490,9 @@ sub list_pairs {
 =for Pod::Coverage ^(.+)$
 
 =head1 DRIVER-SPECIFIC NOTES
+
+C<get_ticker()> doesn't provide the optional C<open>, but provides the optional
+C<quote_volume>.
 
 C<list_pairs()> is manually maintained by this driver instead of using an API,
 because Indodax does not provide an API to list markets/pairs (let alone a
