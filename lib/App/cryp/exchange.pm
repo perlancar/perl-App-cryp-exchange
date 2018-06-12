@@ -10,6 +10,9 @@ use Log::ger;
 
 our %SPEC;
 
+my $fnum0 = [number => {precision=>0}];
+my $fnum8 = [number => {precision=>8}];
+
 our %arg_req0_account = (
     account => {
         schema => 'cryptoexchange::account*',
@@ -179,7 +182,15 @@ sub balance {
     my $res = _init($r); return $res unless $res->[0] == 200;
     my $xchg = $r->{_stash}{exchange_client};
 
-    $xchg->list_balances;
+    $res = $xchg->list_balances;
+
+    $res->[3] //= {};
+    my $resmeta = $res->[3];
+    $resmeta->{'table.fields'}        = ['currency', 'available', 'hold',  'total'];
+    $resmeta->{'table.field_formats'} = [undef,      $fnum8 ,     $fnum8,  $fnum8];
+    $resmeta->{'table.field_aligns'}  = ['left',     'right',     'right', 'right'];
+
+    $res;
 }
 
 $SPEC{cancel_order} = {
@@ -300,7 +311,15 @@ sub open_orders {
     my $res = _init($r); return $res unless $res->[0] == 200;
     my $xchg = $r->{_stash}{exchange_client};
 
-    $xchg->list_open_orders(%args);
+    $res = $xchg->list_open_orders(%args);
+
+    $res->[3] //= {};
+    my $resmeta = $res->[3];
+    $resmeta->{'table.fields'}        = ['pair', 'type', 'order_id', 'create_time',      'price', 'base_size', 'quote_size', 'status', 'filled_base_size', 'filled_quote_size'];
+    $resmeta->{'table.field_formats'} = [undef,  undef,  undef,      'iso8601_datetime', $fnum8 , $fnum8,      $fnum8,       undef,    $fnum8,             $fnum8];
+    $resmeta->{'table.field_aligns'}  = ['left', 'left', 'left',     'left',             'right', 'right',     'right',      'left',   'right',            'right'];
+
+    $res;
 }
 
 $SPEC{orderbook} = {
@@ -349,7 +368,12 @@ sub orderbook {
         }
     }
 
-    [200, "OK", \@rows];
+    my $resmeta = {};
+    $resmeta->{'table.fields'}        = ['type', 'price', 'amount'];
+    $resmeta->{'table.field_formats'} = [undef,  $fnum8,  $fnum8];
+    $resmeta->{'table.field_aligns'}  = ['left', 'right', 'right'];
+
+    [200, "OK", \@rows, $resmeta];
 }
 
 $SPEC{pairs} = {
@@ -369,10 +393,20 @@ sub pairs {
     my $res = _init($r); return $res unless $res->[0] == 200;
     my $xchg = $r->{_stash}{exchange_client};
 
-    $xchg->list_pairs(
+    $res = $xchg->list_pairs(
         detail => $args{detail},
         native => $args{native},
     );
+
+    if ($args{detail}) {
+        $res->[3] //= {};
+        my $resmeta = $res->[3];
+        $resmeta->{'table.fields'}        = ['name', 'base_currency', 'quote_currency', 'min_base_size', 'min_quote_size', 'quote_increment', 'status'];
+        $resmeta->{'table.field_formats'} = [undef,  undef,           undef,            undef,           undef,            undef,             undef];
+        $resmeta->{'table.field_aligns'}  = ['left', 'left',          'left',           'number',        'number',         'number',          'left'];
+    }
+
+    $res;
 }
 
 $SPEC{ticker} = {
