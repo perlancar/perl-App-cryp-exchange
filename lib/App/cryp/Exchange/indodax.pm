@@ -368,14 +368,14 @@ sub get_order {
         $quote_size = $apires->{return}{order}{$key};
         $base_size  = $quote_size / $price;
         my $rkey = "remain_" . ($nquotecur eq 'idr' ? 'rp' : $nquotecur);
-        $filled_quote_size = $quote_size - $apires->{return}{order}{$key};
+        $filled_quote_size = $quote_size - $apires->{return}{order}{$rkey};
         $filled_base_size  = $filled_quote_size / $price;
     } else {
         my $key = "order_" . $nbasecur;
         $base_size = $apires->{return}{order}{$key};
         $quote_size = $base_size * $price;
         my $rkey = "remain_" . $nbasecur;
-        $filled_base_size  = $base_size - $apires->{return}{order}{$key};
+        $filled_base_size  = $base_size - $apires->{return}{order}{$rkey};
         $filled_quote_size = $filled_base_size * $price;
     }
 
