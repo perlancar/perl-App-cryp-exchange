@@ -99,6 +99,11 @@ sub _instantiate_exchange {
             last;
         }
     }
+
+    unless (keys %args) {
+        $args{public_only} = 1;
+    }
+
     $mod->new(%args);
 }
 
