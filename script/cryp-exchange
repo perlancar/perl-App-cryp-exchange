@@ -11,24 +11,41 @@ use warnings;
 use Log::ger;
 
 use Perinci::CmdLine::cryp;
+use PERLANCAR::Module::List;
 
 my $prefix = "/App/cryp/exchange/";
+my $mods = do {
+    # if we are being called during the building of our own dist by dzil (e.g.
+    # by Pod::Weaver::Plugin::Rinci), don't include subcommands installed
+    # outside our dist. otherwise we'll be documenting and depending on
+    # extraneous subcommands.
+    local @INC = ("lib")
+        if $ENV{DZIL} &&
+            # DZP:SetEnv always sets DZIL=1 so we need to know if it's our own
+            # dist that we're building
+        (!defined($ENV{DZIL_NAME}) ||
+         $ENV{DZIL_NAME} eq 'App-cryp-exchange');
+
+    PERLANCAR::Module::List::list_modules(
+        "App::cryp::Cmd::Exchange::", {list_modules=>1});
+};
+my $subcommands = {};
+for my $mod (keys %$mods) {
+    (my $sc_name = $mod) =~ s/App::cryp::Cmd::Exchange:://;
+    $sc_name =~ s/_/-/g;
+
+    (my $url = $mod) =~ s!::!/!g;
+    $subcommands->{$sc_name} = {
+        url => "/$url/handle_cmd",
+    };
+}
 
 Perinci::CmdLine::cryp->new(
     url => $prefix,
     log => 1,
     pass_cmdline_object => 1,
     config_filename => ["cryp.conf", "cryp-exchange.conf"],
-    subcommands => {
-        # public
-        "ls-accounts"       => { url => "${prefix}list_accounts", },
-        "ls-exchanges"      => { url => "${prefix}list_exchanges", },
-        "ls-pairs"          => { url => "${prefix}list_pairs", },
-
-        # private
-        "get-order-book"    => { url => "${prefix}get_order_book", },
-        "ls-balances"       => { url => "${prefix}list_balances", },
-    },
+    subcommands => $subcommands,
 )->run;
 
 # ABSTRACT:
@@ -40,6 +57,7 @@ Create configuration in F<~/.config/cryp-exchange.conf> (or
 F<~/.config/cryp.conf> so configuration can be shared with the other C<cryp-*>
 family of scripts):
 
+ ; equivalent to exchange/indodax/default
  [exchange/indodax]
  api_key    = S6WBYR6Q-TVMTSFOA-YWK6GSNT-H0JMEK6Z-YDF5ML9Y
  api_secret = e16064aa7fb477b267fe774df62194f33583c7f46a09ad931ca2e097aeaa9c9296e1c3b2734bab71
@@ -54,38 +72,91 @@ family of scripts):
  api_secret     = 9B8T2nPFMRUiUIKA82txjaO09iNnJXBMVMdkDgJ0i2YambYKQY8DZAS54ERZE0sE2lzYrpTWfpU7/110xfesZluY
  api_passphrase = gdllszgwO774NN
 
+=head2 General
+
 To list supported exchanges:
 
- % cryp-exchange ls-exchanges
- % cryp-exchange ls-exchanges -l
+ % cryp-exchange exchanges
+ % cryp-exchange exchanges -l
 
-To list pairs offered in an exchange:
+To list pairs supported by an exchange:
 
- % cryp-exchange ls-pairs indodax
- % cryp-exchange ls-pairs coinbase-pro -l
+ % cryp-exchange pairs indodax
 
 To list accounts:
 
- % cryp-exchange ls-accounts
- % cryp-exchange ls-accounts -l
- % cryp-exchange ls-accounts -I coinbase-pro -l ;# only accounts on coinbase-pro
- % cryp-exchange ls-accounts -X coinbase-pro -l ;# all accounts except those on coinbase-pro
+ % cryp-exchange accounts
+ % cryp-exchange accounts -l
+ % cryp-exchange accounts -I coinbase-pro -l ;# only accounts on coinbase-pro
+ % cryp-exchange accounts -X coinbase-pro -l ;# all accounts except those on coinbase-pro
+
+To view ticker (last 24h price and volume information):
+
+ % cryp-exchange ticker coinbase-pro  BTC/USD
 
 To get order book:
 
- % cryp-exchange get-order-book coinbase-pro
+ % cryp-exchange orderbook coinbase-pro
+
+=head2 Balance
+
+To get account balance:
+
+ % cryp-exchange balance coinbase-pro
+ % cryp-exchange balance indodax/wifey
+
+=head2 Order
+
+To create a limit order:
+
+ # buy 100USD worth of BTC at 7000USD/BTC
+ % cryp-exchange create-limit-order coinbase-pro BTC/USD buy 7500 --quote-size 100
+
+ # buy 0.5BTC at 7000USD/BTC
+ % cryp-exchange create-limit-order coinbase-pro BTC/USD buy 7500 --base-size 0.5
+
+To get information about an order:
+
+ % cryp-exchange get-order coinbase-pro BTC/USD buy 6327a864-d2c8-4e3e-8de3-dd71921b7cd0
+
+To list open orders:
+
+ # list all open orders
+ % cryp-exchange open-orders coinbase-pro
+
+ # list open orders for a specific pair only
+ % cryp-exchange open-orders coinbase-pro BTC/USD
+
+To cancel an order:
+
+ % cryp-exchange cancel-order coinbase-pro BTC/USD buy 6327a864-d2c8-4e3e-8de3-dd71921b7cd0
 
 
 =head1 DESCRIPTION
 
 B<Early release. More functionality will be added in the future.>
 
-This utility (and the corresponding backend modules) provide a common interface
-to interact with various cryptocurrency exchanges: common set of subcommands
-(methods) with common arguments and result format, standardized currency codes
-(following L<CryptoCurrency::Catalog>) and pair formats (e.g. C<BTC/USD>).
+cryp-exchange is a multi-cryptoexchange CLI. This distribution provides common
+interface (as CLI as well as driver modules) to interact with different
+cryptocurrency exchanges including:
+
+=over
+
+=item * common set of subcommands (API methods)
+
+Along with common terminology, arguments, error behavior, and result format.
+
+=item * standardized currency codes and pair formats
+
+Following L<CryptoCurrency::Catalog>.
+
+=back
 
 
 =head1 SEE ALSO
 
 The other C<cryp-*> scripts in the family.
+
+L<CryptoCurrency::Catalog>
+
+L<CryptoExchange::Catalog>
