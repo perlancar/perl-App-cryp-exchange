@@ -149,7 +149,7 @@ String. Required.
 =back
 
 Some specific exchanges might require more credentials or arguments (e.g.
-C<api_passphrase> on GDAX); please check with the specific drivers.
+C<api_passphrase> on Coinbase Pro); please check with the specific drivers.
 
 Method must return object.
 

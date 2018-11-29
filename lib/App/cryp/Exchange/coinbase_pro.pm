@@ -1,4 +1,4 @@
-package App::cryp::Exchange::gdax;
+package App::cryp::Exchange::coinbase_pro;
 
 # DATE
 # VERSION
@@ -11,7 +11,7 @@ use Role::Tiny::With;
 with 'App::cryp::Role::Exchange';
 
 sub new {
-    require Finance::GDAX::Lite;
+    require Finance::CoinbasePro::Lite;
 
     my ($class, %args) = @_;
 
@@ -21,7 +21,7 @@ sub new {
             && defined $args{api_passphrase};
     }
 
-    $args{_client} = Finance::GDAX::Lite->new(
+    $args{_client} = Finance::CoinbasePro::Lite->new(
         key => $args{api_key},
         secret => $args{api_secret},
         passphrase => $args{api_passphrase},
@@ -110,6 +110,6 @@ sub list_balances {
 }
 
 1;
-# ABSTRACT: Interact with Bitcoin Indonesia
+# ABSTRACT: Interact with Coinbase Pro
 
 =for Pod::Coverage ^(.+)$
