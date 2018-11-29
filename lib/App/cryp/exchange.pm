@@ -159,8 +159,6 @@ sub accounts {
         }
     }
 
-    $mod->new(%args);
-
     unless ($args{detail}) {
         @res = map { "$_->{exchange}/$_->{account}" } @res;
     }
