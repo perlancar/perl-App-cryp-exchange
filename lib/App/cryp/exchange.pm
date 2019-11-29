@@ -1,6 +1,8 @@
 package App::cryp::exchange;
 
+# AUTHOR
 # DATE
+# DIST
 # VERSION
 
 use 5.010001;
@@ -60,7 +62,7 @@ our %arg_req1_pair = (
 
 our %arg_req3_price = (
     price => {
-        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['str_num_en']],
+        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['From_str::num_en']],
         req => 1,
         pos => 3,
     },
@@ -69,11 +71,11 @@ our %arg_req3_price = (
 our %args_size = (
     base_size => {
         summary => 'Order amount, denominated in base currency (first currency of the pair)',
-        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['str_num_en']],
+        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['From_str::num_en']],
     },
     quote_size => {
         summary => 'Order amount, denominated in quote currency (second currency of the pair)',
-        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['str_num_en']],
+        schema => ['float*', xmin=>0, 'x.perl.coerce_rules'=>['From_str::num_en']],
     },
 );
 
